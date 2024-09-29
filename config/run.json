@@ -1,7 +1,7 @@
 {
   "batch_size_train": 128,
   "batch_size_eval": 256,
-  "num_epochs": 100,
+  "num_epochs": 25,
   "optimizer": "adam",
   "scheduler": "warmup_cosine",
   "learning_rate": 0.001,

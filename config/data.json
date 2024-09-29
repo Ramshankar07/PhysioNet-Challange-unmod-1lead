@@ -1,6 +1,13 @@
 {
   "path": "config/",
-  "datasets": ["CPSC", "CPSC-Extra", "PTB-XL", "Georgia"],
+  "datasets": [
+    "cpsc_2018",
+    "cpsc_2018_extra",
+    "st_petersburg_incart",
+    "ptb",
+    "ptb-xl",
+    "georgia"
+],
   "chunk_length": 2048,
   "chunk_stride": 1536
 }

@@ -70,7 +70,7 @@ def load_data(filename):
     """ load data from WFDB files """
     data = np.asarray(loadmat(filename + ".mat")['val'], dtype=np.float32)
 
-    return data
+    return data[1:2]
 
 
 def load_header(filename):
