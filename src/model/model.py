@@ -8,8 +8,8 @@ import torch.nn.functional as F
 
 
 class ECG_model(nn.Module):
-    """ ecg_model template """
-    def __init__(self, cfg, num_channels, num_classes):
+    """ ECG model template for single-lead input """
+    def __init__(self, cfg, num_classes):
         super(ECG_model, self).__init__()
         block = get_block(cfg)
         N = cfg.num_blocks // 4
@@ -17,7 +17,8 @@ class ECG_model(nn.Module):
         nGroups = [16 * k, 16 * k, 32 * k, 64 * k, 128 * k]
         self.in_channels = nGroups[0]
 
-        self.conv1 = conv_kx1(num_channels, nGroups[0], cfg.kernel_size, stride=1)
+        # First convolution layer is now fixed to 1 input channel
+        self.conv1 = conv_kx1(1, nGroups[0], cfg.kernel_size, stride=1)
         self.layer1 = self._make_layer(block, cfg, nGroups[1], N, stride=1,   first_block=True)
         self.layer2 = self._make_layer(block, cfg, nGroups[2], N, cfg.stride, first_block=False)
         self.layer3 = self._make_layer(block, cfg, nGroups[3], N, cfg.stride, first_block=False)
@@ -61,6 +62,7 @@ class ECG_model(nn.Module):
         outputs = self.linear(outputs)
 
         return outputs
+
 
 
 def get_block(cfg):

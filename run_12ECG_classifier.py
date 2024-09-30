@@ -11,6 +11,12 @@ from src.data import get_dataset_from_configs, collate_into_list, get_loss_weigh
 from src.model.model_utils import get_model
 from src.train import Trainer
 
+def load_partial_state_dict(model, state_dict):
+    model_state_dict = model.state_dict()
+    loaded_state_dict = {k: v for k, v in state_dict.items() if k in model_state_dict and v.shape == model_state_dict[k].shape}
+    model_state_dict.update(loaded_state_dict)
+    model.load_state_dict(model_state_dict)
+
 
 def load_12ECG_model(output_training_directory):
     # load the model from disk
@@ -21,14 +27,14 @@ def load_12ECG_model(output_training_directory):
 
     models, thresholds = [], []
     for fold in range(10):
-        model, _ = get_model(model_cfg, data_cfg.num_channels, len(data_cfg.scored_classes))
+        model, _ = get_model(model_cfg, len(data_cfg.scored_classes))
         checkpoint = torch.load(os.path.join(output_training_directory, 'finalized_model_%d.sav' % fold),
                                 map_location=torch.device("cpu"))
         state_dict = OrderedDict()
         for k, v in checkpoint.items():
             if k.startswith("module."): k = k[7:]
             state_dict[k] = v
-        model.load_state_dict(state_dict, strict=False)
+        load_partial_state_dict(model, state_dict)
         models.append(model)
 
         threshold = np.load(os.path.join(output_training_directory, 'finalized_model_thresholds_%d.npy' % fold))

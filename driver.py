@@ -61,13 +61,14 @@ if __name__ == '__main__':
     # Iterate over files.
     print('Extracting 12ECG features...')
     num_files = len(input_files)
-
+    print(num_files)
     for i, f in enumerate(input_files):
         print('    {}/{}...'.format(i+1, num_files))
         tmp_input_file = os.path.join(input_directory,f)
         data,header_data = load_challenge_data(tmp_input_file)
         current_label, current_score,classes = run_12ECG_classifier(data,header_data, model)
         # Save results.
+        print('going to save')
         save_challenge_predictions(output_directory,f,current_score,current_label,classes)
 
 

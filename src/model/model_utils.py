@@ -9,11 +9,12 @@ from src.model.model import ECG_model
 from src.utils import Print
 
 
-def get_model(model_cfg, num_channels, num_classes):
+def get_model(model_cfg, num_classes):
     """ get model supporting different model types """
-    model = ECG_model(model_cfg, num_channels, num_classes)
+    # Note: We're now passing only model_cfg and num_classes
+    model = ECG_model(model_cfg, num_classes)
     params = get_params_and_initialize(model)
-
+    
     return model, params
 
 

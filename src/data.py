@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy.io import loadmat
-
+import os
 import torch
 
 from src.preprocess import preprocess_signal, preprocess_label
@@ -99,29 +99,54 @@ def get_sample_rate(header):
     return sample_rate
 
 
-def get_filenames_from_split(data_cfg, dataset_idx, split_idx):
-    """ get filenames from config file and split index """
+def get_filenames_from_split(data_cfg, fold, split_idx, base_path):
     filenames_all = []
-    for dataset in data_cfg.datasets:
-        if dataset_idx not in [None, "all", dataset]: continue
+    dataset_dir_mapping = {
+        "cpsc-2018": "cpsc_2018",
+        "cpsc-2018-extra": "cpsc_2018_extra",
+        "st_petersburg_incart": "st_petersburg_incart",
+        "ptb": "ptb",
+        "ptb-xl": "ptb-xl",
+        "georgia": "georgia"
+    }
+
+    for dataset, dir_name in dataset_dir_mapping.items():
+        dataset_path = os.path.join(base_path, dir_name)
+        if not os.path.exists(dataset_path):
+            continue
+
+        if dataset not in data_cfg.split:
+            continue
+
+        split_data = data_cfg.split[dataset]
 
         filenames = []
-        if data_cfg.fold in list(range(10)):
+        if fold in list(range(10)):
             if split_idx == "train":
-                for fold in range(10):
-                    if fold != data_cfg.fold:
-                        filenames += data_cfg.split[dataset]["fold%d" % fold]
-            else:
-                filenames += data_cfg.split[dataset]["fold%d" % data_cfg.fold]
-        elif data_cfg.fold in ["sanity"]:
-            filenames += data_cfg.split[dataset]["all"][:1]
+                for i in range(10):
+                    if i != fold:
+                        fold_key = f'fold{i}'
+                        if fold_key in split_data:
+                            filenames.extend([os.path.join(dataset_path, f) for f in split_data[fold_key]])
+            elif split_idx == "val":
+                fold_key = f'fold{fold}'
+                if fold_key in split_data:
+                    filenames.extend([os.path.join(dataset_path, f) for f in split_data[fold_key]])
+        elif fold == "sanity":
+            filenames.extend([os.path.join(dataset_path, f) for f in split_data.get("all", [])[:1]])
         else:
-            filenames += data_cfg.split[dataset][split_idx]
+            filenames.extend([os.path.join(dataset_path, f) for f in split_data.get(split_idx, [])])
 
-        filenames_all += [data_cfg.path + "/%s/%s" % (dataset, filename) for filename in filenames]
+        valid_filenames = []
+        for filename in filenames:
+            if os.path.exists(filename):
+                valid_filenames.append(filename)
+            elif os.path.exists(filename + ".mat"):
+                valid_filenames.append(filename + ".mat")
+
+        filenames_all.extend(valid_filenames)
 
     return filenames_all
-
 
 def get_eval_dataset_split_idxs(data_cfg):
     """ get dataset and split idxs for evaluation """
