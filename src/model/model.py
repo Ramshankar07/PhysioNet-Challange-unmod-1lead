@@ -40,6 +40,7 @@ class ECG_model(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x, flags, lam=None, p=None):
+        print(f"Input shape: {x.shape}") 
         out = self.conv1(x)
         out = self.layer1(out)
         out = self.layer2(out)

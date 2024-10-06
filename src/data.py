@@ -21,10 +21,31 @@ class ecg_dataset(torch.utils.data.Dataset):
         return len(self.filenames)
 
     def __getitem__(self, i):
-        x = preprocess_signal(load_data(self.filenames[i]), self.preprocess_cfg, self.sample_rates[i])
+        # Load and preprocess the full ECG data
+        full_ecg = preprocess_signal(load_data(self.filenames[i]), self.preprocess_cfg, self.sample_rates[i])
+        
+        # Ensure we have at least one channel, if not, add a channel dimension
+        if full_ecg.ndim == 1:
+            full_ecg = full_ecg[np.newaxis, :]
+        elif full_ecg.ndim == 2 and full_ecg.shape[0] > 1:
+            # If we have multiple leads, let's use the second lead (index 1)
+            full_ecg = full_ecg[1:2, :]
+        
+        x = full_ecg  # This should now be shape (1, length)
         y = self.Y[i]
 
-        return torch.from_numpy(x), y
+        return torch.from_numpy(x).float(), y
+
+        return torch.from_numpy(x).float(), y
+
+    @staticmethod
+    def collate_fn(batch):
+        # This function can be used to handle variable-length sequences if needed
+        x, y = zip(*batch)
+        x = [torch.Tensor(x_) for x_ in x]
+        x = torch.nn.utils.rnn.pad_sequence(x, batch_first=True, padding_value=0)
+        y = torch.stack(y)
+        return x, y
 
 
 class ecg_dataset_for_inference(torch.utils.data.Dataset):
@@ -41,36 +62,68 @@ class ecg_dataset_for_inference(torch.utils.data.Dataset):
 
 
 def get_dataset_from_configs(data_cfg, preprocess_cfg, dataset_idx=None, split_idx=None, sanity_check=False):
-    """ load ecg dataset from config files """
+    """ load ecg dataset from config files, extracting only the 2nd lead """
     if data_cfg.data is not None:
+        # For inference mode
         x = preprocess_signal(data_cfg.data, preprocess_cfg, get_sample_rate(data_cfg.header))
+        x = x[1:2, :]  # Extract only the 2nd lead
         y = np.zeros((1), np.float32)  # dummy label for code compatibility
         X = [torch.from_numpy(x).float()]
         Y = [torch.from_numpy(y)]
         dataset = ecg_dataset_for_inference(X, Y)
     else:
-        if data_cfg.filenames is not None: filenames_all = data_cfg.filenames
-        else:                              filenames_all = get_filenames_from_split(data_cfg, dataset_idx, split_idx)
+        # For training/validation mode
+        if data_cfg.filenames is not None:
+            filenames_all = data_cfg.filenames
+        else:
+            filenames_all = get_filenames_from_split(data_cfg, dataset_idx, split_idx)
+        
+        print(f"Total files found: {len(filenames_all)}")
+        w=0
         filenames, sample_rates, Y = [], [], []
         for filename in filenames_all:
-            if sanity_check and len(filenames) == 64: break
-            header = load_header(filename)
-            y = preprocess_label(get_labels(header), data_cfg.scored_classes, data_cfg.equivalent_classes)
-            if np.sum(y) != 0 or (split_idx == "train" and preprocess_cfg.all_negative):
-                filenames.append(filename)
-                sample_rates.append(get_sample_rate(header))
-                Y.append(torch.from_numpy(y))
-
+            if sanity_check:
+                break
+            try:
+                
+                header = load_header(filename)
+                # print(header)
+                y = preprocess_label(get_labels(header), data_cfg.scored_classes, data_cfg.equivalent_classes)
+                # print(y)
+                if np.sum(y) != 0 or (split_idx == "train" and preprocess_cfg.all_negative):
+                    print(w)
+                    filenames.append(filename)
+                    sample_rates.append(get_sample_rate(header))
+                    Y.append(torch.from_numpy(y))
+            except Exception as e:
+                print(f"Error processing file {filename}: {str(e)}")
+        
+        print(f"Files accepted: {len(filenames)}")
+        
+        if not filenames:
+            print("No valid files found. Here's some debug information:")
+            
+            raise ValueError("No valid files found. Check your data directory and configurations.")
+        
         dataset = ecg_dataset(filenames, sample_rates, Y, preprocess_cfg)
-
+    
+    print(f"Dataset size: {len(dataset)}")
     return dataset
 
 
 def load_data(filename):
     """ load data from WFDB files """
-    data = np.asarray(loadmat(filename + ".mat")['val'], dtype=np.float32)
-
-    return data[1:2]
+    data = np.asarray(loadmat(filename)['val'], dtype=np.float32)
+    
+    # Ensure data is 2D
+    if data.ndim == 1:
+        data = data[np.newaxis, :]
+    elif data.ndim > 2:
+        data = data.squeeze()
+        if data.ndim == 1:
+            data = data[np.newaxis, :]
+    
+    return data
 
 
 def load_header(filename):
@@ -86,9 +139,14 @@ def get_labels(header):
     """ get labels from header """
     labels = []
     for line in header:
-        if line.startswith('#Dx'):
-            labels = [label.strip() for label in line.split(': ')[1].split(',')]
-
+        if line.lower().startswith('# dx:'):  # Case-insensitive check, allowing for space
+            # Split on ':' and strip whitespace
+            dx_part = line.split(':', 1)[1].strip()
+            # Split on comma if multiple labels, otherwise use the whole string
+            labels = [label.strip() for label in dx_part.split(',') if label.strip()]
+            break  # Stop after finding the Dx line
+    
+    # print(f"Labels found: {labels}")  # Debug print
     return labels
 
 
@@ -102,23 +160,29 @@ def get_sample_rate(header):
 def get_filenames_from_split(data_cfg, fold, split_idx, base_path):
     filenames_all = []
     dataset_dir_mapping = {
-        "cpsc-2018": "cpsc_2018",
-        "cpsc-2018-extra": "cpsc_2018_extra",
+        "cpsc_2018": "cpsc_2018",
+        "cpsc_2018_extra": "cpsc_2018_extra",
         "st_petersburg_incart": "st_petersburg_incart",
         "ptb": "ptb",
         "ptb-xl": "ptb-xl",
         "georgia": "georgia"
     }
+    print(f"Base path: {base_path}")
+    print(f"Datasets in data_cfg: {data_cfg.datasets}")
 
     for dataset, dir_name in dataset_dir_mapping.items():
         dataset_path = os.path.join(base_path, dir_name)
+        print(f"Checking dataset path: {dataset_path}")
         if not os.path.exists(dataset_path):
+            print(f"  Directory does not exist: {dataset_path}")
             continue
 
         if dataset not in data_cfg.split:
+            print(f"  Dataset {dataset} not in data_cfg.split")
             continue
 
         split_data = data_cfg.split[dataset]
+        print(f"  Split data for {dataset}: {split_data.keys()}")
 
         filenames = []
         if fold in list(range(10)):

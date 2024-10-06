@@ -1,5 +1,5 @@
 {
-  "path": "config/",
+  "path": "/physionet/input/",
   "datasets": [
     "cpsc_2018",
     "cpsc_2018_extra",

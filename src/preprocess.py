@@ -7,6 +7,10 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
 
 def preprocess_signal(x, preprocess_cfg, sample_rate):
     """ resample, filter, scale, ecg signal """
+    # Ensure x is 2D
+    if x.ndim == 1:
+        x = x[np.newaxis, :]
+    
     if sample_rate != preprocess_cfg.sample_rate:
         num = x.shape[1] // sample_rate * preprocess_cfg.sample_rate
         x = sig.resample(x, num, axis=1)
@@ -60,6 +64,7 @@ def augment_signal(x):
 def preprocess_label(labels, scored_classes, equivalent_classes):
     """ convert string labels to binary labels """
     y = np.zeros((len(scored_classes)), np.float32)
+    
     for label in labels:
         if label in equivalent_classes:
             label = equivalent_classes[label]

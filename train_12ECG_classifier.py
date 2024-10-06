@@ -60,13 +60,15 @@ def train_12ECG_classifier(input_training_directory, output_training_directory):
     run_cfg = config.RunConfig("config/run.json", eval=False)
     #os.environ['CUDA_VISIBLE_DEVICES'] = "0"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    
     ## Training
     for fold in range(10):
         print('Loading data %d...' % fold)
         set_seeds(2020)
         data_cfg.filenames = get_filenames_from_split(data_cfg, fold, "train", input_training_directory)
         dataset_train = get_dataset_from_configs(data_cfg, preprocess_cfg, split_idx="train")
+        if dataset_train is None:
+            print("none")
         data_cfg.filenames = get_filenames_from_split(data_cfg, fold, "val", input_training_directory)
         dataset_val = get_dataset_from_configs(data_cfg, preprocess_cfg, split_idx="val")
         iterator_train = torch.utils.data.DataLoader(dataset_train, run_cfg.batch_size_train, collate_fn=collate_into_list,
@@ -77,7 +79,7 @@ def train_12ECG_classifier(input_training_directory, output_training_directory):
         print("evaluation samples: %d" % len(dataset_val))
 
         ## initialize a model
-        model, params = get_model(model_cfg, data_cfg.num_channels, len(data_cfg.scored_classes))
+        model, params = get_model(model_cfg, len(data_cfg.scored_classes))
         get_profile(model, data_cfg.num_channels, data_cfg.chunk_length)
 
         ## setup trainer configurations
@@ -114,7 +116,7 @@ def train_12ECG_classifier(input_training_directory, output_training_directory):
         ## save a model
         print('Saving model %d...' % fold)
         fold_model = os.path.join(output_training_directory, '%d_*' % (fold))
-        best_model = os.path.join(output_training_directory, '%d_epoch%d.sav' % (fold, np.argmax(PNC_list)))
+        best_model = os.path.join(output_training_directory, '%d_best-epoch%d.sav' % (fold, np.argmax(PNC_list)))
         final_model = os.path.join(output_training_directory, 'finalized_model_%d.sav' % fold)
         os.system("cp %s %s" % (best_model, final_model))
         os.system("rm -rf %s" % fold_model)

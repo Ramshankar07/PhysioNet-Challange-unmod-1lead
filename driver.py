@@ -34,7 +34,31 @@ def save_challenge_predictions(output_directory,filename,scores,labels,classes):
     with open(output_file, 'w') as f:
         f.write(recording_string + '\n' + class_string + '\n' + label_string + '\n' + score_string + '\n')
 
+scored_classes = [
+    "164890007", "164889003", "426627000", "426783006", "284470004",
+    "427393009", "426177001", "427084000", "427172004"
+]
+equivalent_classes = {
+    "63593006": "284470004",
+    "17338001": "427172004"
+}
 
+def load_mat_labels(filename):
+    header_file = filename.rsplit('.', 1)[0] + '.hea'
+    with open(header_file, 'r') as f:
+        for line in f:
+            if line.startswith('# Dx'):
+                return line.split(': ')[1].strip().split(',')
+    return []
+
+def preprocess_label(labels, scored_classes, equivalent_classes):
+    y = np.zeros((len(scored_classes)), dtype=np.float32)
+    for label in labels:
+        if label in equivalent_classes:
+            label = equivalent_classes[label]
+        if label in scored_classes:
+            y[scored_classes.index(label)] = 1
+    return y
 
 if __name__ == '__main__':
     # Parse arguments.
@@ -47,9 +71,32 @@ if __name__ == '__main__':
 
     # Find files.
     input_files = []
-    for f in os.listdir(input_directory):
-        if os.path.isfile(os.path.join(input_directory, f)) and not f.lower().startswith('.') and f.lower().endswith('mat'):
-            input_files.append(f)
+    # for f in os.listdir(input_directory):
+        # if os.path.isfile(os.path.join(input_directory, f)):
+            # cpsc_dir = os.path.join(input_directory, "cpsc_2018")
+            # if not cpsc_dir.lower().startswith('.') and cpsc_dir.lower().endswith('.mat'):
+                
+            #     if os.path.isdir(cpsc_dir):
+            #         hea_file = os.path.join(cpsc_dir, f.rsplit('.', 1)[0] + '.hea')
+            #         if os.path.isfile(hea_file):
+            #             labels = load_mat_labels(hea_file)
+            #             preprocessed_labels = preprocess_label(labels, scored_classes, equivalent_classes)
+            #             if np.any(preprocessed_labels):  # Check if any labels are present
+            #                 input_files.append((f, preprocessed_labels))
+    
+    cpsc_dir = os.path.join(input_directory, "cpsc_2018")
+    for f in os.listdir(cpsc_dir):
+        # print(f)
+        if f.endswith('.mat'):
+            # print(f)
+                
+            hea_file = os.path.join(cpsc_dir, f.rsplit('.', 1)[0] + '.hea')
+            if os.path.isfile(hea_file): 
+                # print("yes")
+                labels = load_mat_labels(hea_file)
+                preprocessed_labels = preprocess_label(labels, scored_classes, equivalent_classes)
+                if np.any(preprocessed_labels):  # Check if any labels are present
+                    input_files.append(f)
 
     if not os.path.isdir(output_directory):
         os.mkdir(output_directory)
@@ -64,7 +111,7 @@ if __name__ == '__main__':
     print(num_files)
     for i, f in enumerate(input_files):
         print('    {}/{}...'.format(i+1, num_files))
-        tmp_input_file = os.path.join(input_directory,f)
+        tmp_input_file = os.path.join(cpsc_dir,f)
         data,header_data = load_challenge_data(tmp_input_file)
         current_label, current_score,classes = run_12ECG_classifier(data,header_data, model)
         # Save results.

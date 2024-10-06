@@ -1,7 +1,6 @@
 FROM pytorch/pytorch:1.5.1-cuda10.1-cudnn7-runtime
 
-## The MAINTAINER instruction sets the Author field of the generated images
-MAINTAINER mswzeus@gmail.com
+
 ## DO NOT EDIT THESE 3 lines
 RUN mkdir /physionet
 COPY ./ /physionet

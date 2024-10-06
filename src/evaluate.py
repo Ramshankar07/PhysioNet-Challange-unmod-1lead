@@ -23,7 +23,7 @@ def evaluate_12ECG_score(label_directory, output_directory):
     # Define the weights, the SNOMED CT code for the normal class, and equivalent SNOMED CT codes.
     weights_file = 'weights.csv'
     normal_class = '426783006'
-    equivalent_classes = [['713427006', '59118001'], ['284470004', '63593006'], ['427172004', '17338001']]
+    equivalent_classes = [['284470004', '63593006'], ['427172004', '17338001']]
 
     # Find the label and output files.
     print('Finding label and output files...')
